@@ -11,13 +11,7 @@ import { uploadToCloudinary } from "../services/cloudinary.service.js";
 
 const router = Router();
 
-const OUTPUT_DIR = process.env.OUTPUT_DIR || "./outputs";
 const MAX_FILE_SIZE = parseInt(process.env.MAX_FILE_SIZE || "104857600", 10);
-
-// Ensure output directory exists (for temporary processing)
-if (!fs.existsSync(OUTPUT_DIR)) {
-  fs.mkdirSync(OUTPUT_DIR, { recursive: true });
-}
 
 // Configure multer to use memory storage (files will be uploaded to Cloudinary)
 const storage = multer.memoryStorage();
