@@ -6,4 +6,4 @@ outputs
 *.log
 .DS_Store
 src
-tsconfig.json
+
