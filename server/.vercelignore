@@ -5,5 +5,5 @@ uploads
 outputs
 *.log
 .DS_Store
-src
+dist
 
