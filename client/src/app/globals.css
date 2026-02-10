@@ -1,0 +1,141 @@
+@import "tailwindcss";
+
+/* ─── Custom Properties (Black & White Theme) ─── */
+:root {
+  --background: #ffffff;
+  --foreground: #000000;
+  --muted: #f5f5f5;
+  --muted-foreground: #666666;
+  --border: #e0e0e0;
+  --primary: #000000;
+  --primary-foreground: #ffffff;
+  --primary-hover: #333333;
+  --secondary: #333333;
+  --accent: #666666;
+  --success: #22c55e;
+  --danger: #ef4444;
+  --card: #ffffff;
+  --card-foreground: #000000;
+  --radius: 0.75rem;
+  --shadow-sm: 0 1px 2px 0 rgb(0 0 0 / 0.05);
+  --shadow: 0 1px 3px 0 rgb(0 0 0 / 0.1), 0 1px 2px -1px rgb(0 0 0 / 0.1);
+  --shadow-md: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
+  --shadow-lg: 0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1);
+}
+
+/* Dark Mode (Black background, White text) */
+@media (prefers-color-scheme: dark) {
+  :root {
+    --background: #000000;
+    --foreground: #ffffff;
+    --muted: #1a1a1a;
+    --muted-foreground: #999999;
+    --border: #333333;
+    --primary: #ffffff;
+    --primary-foreground: #000000;
+    --primary-hover: #e0e0e0;
+    --secondary: #cccccc;
+    --accent: #999999;
+    --card: #111111;
+    --card-foreground: #ffffff;
+  }
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-border: var(--border);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-primary-hover: var(--primary-hover);
+  --color-secondary: var(--secondary);
+  --color-accent: var(--accent);
+  --color-success: var(--success);
+  --color-danger: var(--danger);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --font-sans: var(--font-geist-sans);
+  --font-mono: var(--font-geist-mono);
+}
+
+/* ─── Base ─── */
+* {
+  border-color: var(--border);
+}
+
+body {
+  background: var(--background);
+  color: var(--foreground);
+  font-family: var(--font-geist-sans), system-ui, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* ─── Scrollbar ─── */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: var(--muted-foreground);
+  border-radius: 9999px;
+}
+
+/* ─── Utilities ─── */
+.glass {
+  backdrop-filter: blur(12px) saturate(180%);
+  background: rgba(255, 255, 255, 0.72);
+}
+@media (prefers-color-scheme: dark) {
+  .glass {
+    background: rgba(15, 23, 42, 0.72);
+  }
+}
+
+.gradient-text {
+  background: linear-gradient(135deg, var(--primary) 0%, var(--secondary) 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+/* Button gradient - always dark for visibility */
+.gradient-bg {
+  background: linear-gradient(135deg, #000000 0%, #333333 100%);
+  color: #ffffff;
+}
+
+@media (prefers-color-scheme: dark) {
+  .gradient-bg {
+    background: linear-gradient(135deg, #ffffff 0%, #e0e0e0 100%);
+    color: #000000;
+  }
+}
+
+.card-hover {
+  transition: all 0.2s ease;
+}
+.card-hover:hover {
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-lg);
+}
+
+/* ─── Animations ─── */
+@keyframes float {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-10px); }
+}
+
+@keyframes pulse-slow {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.5; }
+}
+
+.animate-float {
+  animation: float 3s ease-in-out infinite;
+}
