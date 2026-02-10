@@ -7,7 +7,8 @@ import { PDFDocument, rgb, degrees as pdfDegrees, StandardFonts } from "pdf-lib"
 import sharp from "sharp";
 import mammoth from "mammoth";
 import * as XLSX from "xlsx";
-import pdfParse from "pdf-parse";
+import pdfParseModule from "pdf-parse";
+const pdfParse = (pdfParseModule as any).default || pdfParseModule;
 import { AuthRequest, optionalAuth } from "../middleware/auth.js";
 import { handleConversion } from "../services/conversion.service.js";
 import { uploadToCloudinary } from "../services/cloudinary.service.js";
@@ -793,7 +794,7 @@ textToPdfTools.forEach(tool => {
       // Handle CSV/TSV - create table format
       if (tool === "csv-to-pdf" || tool === "tsv-to-pdf") {
         const delimiter = tool === "csv-to-pdf" ? "," : "\t";
-        const rows = textContent.split("\n").filter(row => row.trim());
+        const rows = textContent.split("\n").filter((row: string) => row.trim());
         
         let page = pdfDoc.addPage([792, 612]); // Landscape
         let y = 570;
@@ -1212,7 +1213,28 @@ router.post("/speech-to-pdf", optionalAuth, upload.single("file"), async (req: A
       "integrate one of the above services in production."
     ];
     
-    for (const line of note) {\n      page.drawText(line, {\n        x: 50,\n        y,\n        size: 11,\n        font\n      });\n      y -= 20;\n    }\n\n    const pdfBytes = await pdfDoc.save();\n\n    await handleConversion(req, res, {\n      buffer: Buffer.from(pdfBytes),\n      filename: file.originalname.replace(/\.[^.]+$/, \"_transcription.pdf\"),\n      mimetype: \"application/pdf\"\n    });\n  } catch (error) {\n    console.error(\"Speech to PDF error:\", error);\n    res.status(500).json({ message: \"Conversion failed\" });\n  }\n});
+    for (const line of note) {
+      page.drawText(line, {
+        x: 50,
+        y,
+        size: 11,
+        font
+      });
+      y -= 20;
+    }
+
+    const pdfBytes = await pdfDoc.save();
+
+    await handleConversion(req, res, {
+      buffer: Buffer.from(pdfBytes),
+      filename: file.originalname.replace(/\.[^.]+$/, "_transcription.pdf"),
+      mimetype: "application/pdf"
+    });
+  } catch (error) {
+    console.error("Speech to PDF error:", error);
+    res.status(500).json({ message: "Conversion failed" });
+  }
+});
 
 // ═══════════════════════════════════════════════════════════════════════════
 // CONVERT FROM PDF TOOLS (22 tools)
@@ -1337,8 +1359,8 @@ pdfToTextTools.forEach(tool => {
         fileExtension = ".doc";
       } else if (tool === "pdf-to-excel") {
         // Create Excel file from extracted text
-        const lines = textContent.split("\n").filter(line => line.trim());
-        const rows = lines.map(line => {
+        const lines = textContent.split("\n").filter((line: string) => line.trim());
+        const rows = lines.map((line: string) => {
           // Try to detect if line contains tabular data
           if (line.includes("\t")) {
             return line.split("\t");
