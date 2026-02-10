@@ -13,9 +13,11 @@
     "vercel-build": "tsc"
   },
   "dependencies": {
+    "@types/pdf-parse": "^1.1.5",
     "@types/sharp": "^0.31.1",
     "archiver": "^7.0.1",
     "bcryptjs": "^3.0.3",
+    "canvas": "^3.2.1",
     "cloudinary": "^2.9.0",
     "cors": "^2.8.5",
     "dotenv": "^16.4.5",
@@ -24,8 +26,10 @@
     "mammoth": "^1.11.0",
     "mongoose": "^9.1.6",
     "multer": "^2.0.2",
+    "node-qpdf2": "^6.0.0",
     "pdf-lib": "^1.17.1",
     "pdf-parse": "^2.4.5",
+    "pdfjs-dist": "^5.4.624",
     "sharp": "^0.34.5",
     "streamifier": "^0.1.1",
     "uuid": "^13.0.0",
