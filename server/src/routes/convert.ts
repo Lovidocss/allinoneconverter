@@ -973,8 +973,13 @@ docToPdfTools.forEach(tool => {
       // Word to PDF conversion
       if (tool === "word-to-pdf" && (file.mimetype.includes("word") || file.originalname.endsWith(".docx") || file.originalname.endsWith(".doc"))) {
         try {
+          console.log(`Processing Word file: ${file.originalname}, mimetype: ${file.mimetype}`);
           const result = await mammoth.extractRawText({ buffer: file.buffer });
           const text = result.value;
+          
+          if (!text || text.trim().length === 0) {
+            throw new Error("No text content found in Word document");
+          }
           
           const pdfDoc = await PDFDocument.create();
           const font = await pdfDoc.embedFont(StandardFonts.Helvetica);
@@ -1005,7 +1010,8 @@ docToPdfTools.forEach(tool => {
           const pdfDoc = await PDFDocument.create();
           const font = await pdfDoc.embedFont(StandardFonts.Helvetica);
           const page = pdfDoc.addPage([612, 792]);
-          page.drawText(`Converted from ${file.originalname}`, { x: 50, y: 700, size: 16, font, color: rgb(0, 0, 0) });
+          page.drawText(`Word file: ${file.originalname}`, { x: 50, y: 700, size: 16, font, color: rgb(0, 0, 0) });
+          page.drawText("Could not extract text content", { x: 50, y: 650, size: 12, font, color: rgb(1, 0, 0) });
           pdfBytes = Buffer.from(await pdfDoc.save());
         }
       }
