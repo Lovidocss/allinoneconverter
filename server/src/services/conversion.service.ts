@@ -1,6 +1,6 @@
 import { Response } from "express";
-import { AuthRequest } from "../middleware/auth";
-import { uploadToCloudinary, deleteFromCloudinary, deleteMultipleFromCloudinary } from "./cloudinary.service";
+import { AuthRequest } from "../middleware/auth.js";
+import { uploadToCloudinary, deleteFromCloudinary, deleteMultipleFromCloudinary } from "./cloudinary.service.js";
 
 interface ProcessedFile {
   buffer: Buffer;

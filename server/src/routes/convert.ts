@@ -5,9 +5,9 @@ import fs from "fs";
 import { v4 as uuidv4 } from "uuid";
 import { PDFDocument, rgb, degrees as pdfDegrees, StandardFonts } from "pdf-lib";
 import sharp from "sharp";
-import { AuthRequest, optionalAuth } from "../middleware/auth";
-import { handleConversion } from "../services/conversion.service";
-import { uploadToCloudinary } from "../services/cloudinary.service";
+import { AuthRequest, optionalAuth } from "../middleware/auth.js";
+import { handleConversion } from "../services/conversion.service.js";
+import { uploadToCloudinary } from "../services/cloudinary.service.js";
 
 const router = Router();
 

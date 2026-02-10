@@ -4,14 +4,14 @@ dotenv.config();
 
 import express from "express";
 import cors from "cors";
-import { connectDB } from "./config/db";
-import authRoutes from "./routes/auth";
-import userRoutes from "./routes/users";
-import ticketRoutes from "./routes/tickets";
-import uploadRoutes from "./routes/upload";
-import historyRoutes from "./routes/history";
-import adminRoutes from "./routes/admin";
-import convertRoutes from "./routes/convert";
+import { connectDB } from "./config/db.js";
+import authRoutes from "./routes/auth.js";
+import userRoutes from "./routes/users.js";
+import ticketRoutes from "./routes/tickets.js";
+import uploadRoutes from "./routes/upload.js";
+import historyRoutes from "./routes/history.js";
+import adminRoutes from "./routes/admin.js";
+import convertRoutes from "./routes/convert.js";
 
 const app = express();
 const PORT = process.env.PORT || 5000;

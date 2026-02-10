@@ -1,6 +1,6 @@
 import express from "express";
-import { FileHistory } from "../models/FileHistory";
-import { verifyToken, AuthRequest } from "../middleware/auth";
+import { FileHistory } from "../models/FileHistory.js";
+import { verifyToken, AuthRequest } from "../middleware/auth.js";
 
 const router = express.Router();
 

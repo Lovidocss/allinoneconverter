@@ -1,4 +1,4 @@
-import cloudinary from "../config/cloudinary";
+import cloudinary from "../config/cloudinary.js";
 import { v4 as uuidv4 } from "uuid";
 import streamifier from "streamifier";
 
