@@ -58,8 +58,11 @@ app.use((err: Error, req: express.Request, res: express.Response, next: express.
   res.status(500).json({ message: "Internal server error" });
 });
 
-// Start server (local development)
-if (process.env.NODE_ENV !== "production") {
+// Connect to database for serverless
+if (process.env.VERCEL || process.env.NODE_ENV === "production") {
+  connectDB().catch(err => console.error("DB connection error:", err));
+} else {
+  // Start server (local development)
   async function startServer() {
     try {
       await connectDB();
@@ -73,10 +76,7 @@ if (process.env.NODE_ENV !== "production") {
     }
   }
   startServer();
-} else {
-  // For Vercel serverless deployment
-  connectDB().catch(err => console.error("DB connection error:", err));
 }
 
-// Export for Vercel
+// Export for Vercel serverless
 export default app;

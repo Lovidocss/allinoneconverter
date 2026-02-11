@@ -2,25 +2,20 @@
   "version": 2,
   "builds": [
     {
-      "src": "dist/index.js",
-      "use": "@vercel/node",
-      "config": {
-        "maxDuration": 60,
-        "memory": 3008
-      }
+      "src": "api/index.ts",
+      "use": "@vercel/node"
     }
   ],
   "routes": [
     {
       "src": "/(.*)",
-      "dest": "dist/index.js"
+      "dest": "/api/index.ts"
     }
   ],
   "functions": {
-    "dist/index.js": {
+    "api/**/*.ts": {
       "maxDuration": 60,
       "memory": 3008
     }
-  },
-  "outputDirectory": "dist"
+  }
 }
