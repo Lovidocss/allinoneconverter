@@ -105,9 +105,22 @@ export const handleConversion = async (
     }
 
     res.json(result);
-  } catch (error) {
+  } catch (error: unknown) {
     console.error("Conversion handling error:", error);
-    res.status(500).json({ message: "Conversion failed" });
+    const errorMessage = error instanceof Error ? error.message : "Conversion failed";
+    const errorStack = error instanceof Error ? error.stack : undefined;
+    
+    console.error("Detailed error:", {
+      message: errorMessage,
+      stack: errorStack,
+      isAuthenticated: !!req.user,
+      fileCount: Array.isArray(processedFile) ? processedFile.length : 1
+    });
+    
+    res.status(500).json({ 
+      message: errorMessage,
+      error: process.env.NODE_ENV === "development" ? errorStack : undefined
+    });
   }
 };
 
