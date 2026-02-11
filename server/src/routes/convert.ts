@@ -2801,44 +2801,632 @@ const businessTools = [
   "meesho-pdf-tool", "manual-crop", "margin-crop"
 ];
 
-businessTools.forEach(tool => {
-  router.post(`/${tool}`, optionalAuth, upload.single("file"), async (req: AuthRequest, res: Response): Promise<void> => {
-    try {
-      const file = req.file;
+// Handwritten Signature Generator
+router.post("/handwritten-sign", optionalAuth, upload.none(), async (req: AuthRequest, res: Response): Promise<void> => {
+  try {
+    const signatureName = (req.body.name || "Signature").toString();
+    const style = (req.body.style || "cursive").toString(); // cursive, print, formal
+    const color = (req.body.color || "black").toString();
+    const outputFormat = (req.body.format || "png").toString(); // png, pdf
+    
+    // Create signature image using Sharp
+    const width = 400;
+    const height = 150;
+    
+    // Color mapping
+    const colors: { [key: string]: string } = {
+      black: "#000000",
+      blue: "#0033CC",
+      red: "#CC0000",
+      green: "#006600"
+    };
+    const hexColor = colors[color] || colors.black;
+    
+    // Create SVG signature
+    const svgSignature = `
+      <svg width="${width}" height="${height}" xmlns="http://www.w3.org/2000/svg">
+        <style>
+          .signature {
+            font-family: ${style === "cursive" ? "'Brush Script MT', cursive" : style === "formal" ? "'Times New Roman', serif" : "Arial, sans-serif"};
+            font-size: ${style === "cursive" ? "48px" : "36px"};
+            fill: ${hexColor};
+            ${style === "cursive" ? "font-style: italic;" : ""}
+          }
+        </style>
+        <rect width="100%" height="100%" fill="transparent"/>
+        <text x="50%" y="60%" class="signature" text-anchor="middle" dominant-baseline="middle">${signatureName}</text>
+        <line x1="30" y1="${height - 20}" x2="${width - 30}" y2="${height - 20}" stroke="${hexColor}" stroke-width="1" opacity="0.5"/>
+      </svg>
+    `;
+    
+    const signatureBuffer = await sharp(Buffer.from(svgSignature))
+      .png()
+      .toBuffer();
+    
+    if (outputFormat === "pdf") {
+      const pdfDoc = await PDFDocument.create();
+      const pngImage = await pdfDoc.embedPng(signatureBuffer);
+      const page = pdfDoc.addPage([width, height]);
+      page.drawImage(pngImage, { x: 0, y: 0, width, height });
       
-      if (!file && !["handwritten-sign"].includes(tool)) {
-        res.status(400).json({ message: "No file provided" });
-        return;
-      }
-
-      if (tool === "handwritten-sign") {
-        const pdfDoc = await PDFDocument.create();
-        const page = pdfDoc.addPage([300, 100]);
-        const font = await pdfDoc.embedFont(StandardFonts.TimesRomanItalic);
-        page.drawText("Signature", { x: 50, y: 50, size: 24, font });
-        
-        const pdfBytes = await pdfDoc.save();
-        
-        await handleConversion(req, res, {
-          buffer: Buffer.from(pdfBytes),
-          filename: "signature.pdf",
-          mimetype: "application/pdf"
-        });
-        return;
-      }
-
-      const buffer = file!.buffer;
-
+      const pdfBytes = await pdfDoc.save();
+      
       await handleConversion(req, res, {
-        buffer,
-        filename: file!.originalname,
-        mimetype: file!.mimetype
+        buffer: Buffer.from(pdfBytes),
+        filename: "signature.pdf",
+        mimetype: "application/pdf"
       });
-    } catch (error) {
-      console.error(`${tool} error:`, error);
-      res.status(500).json({ message: `${tool} failed` });
+    } else {
+      await handleConversion(req, res, {
+        buffer: signatureBuffer,
+        filename: "signature.png",
+        mimetype: "image/png"
+      });
     }
-  });
+  } catch (error) {
+    console.error("Handwritten sign error:", error);
+    res.status(500).json({ message: "Signature generation failed" });
+  }
+});
+
+// Excel Converter - Convert Excel to various formats
+router.post("/excel-converter", optionalAuth, upload.single("file"), async (req: AuthRequest, res: Response): Promise<void> => {
+  try {
+    const file = req.file;
+    if (!file) {
+      res.status(400).json({ message: "No file provided" });
+      return;
+    }
+    
+    const outputFormat = (req.body.format || "pdf").toString(); // pdf, csv, json, html
+    
+    const workbook = XLSX.read(file.buffer, { type: "buffer" });
+    
+    if (outputFormat === "csv") {
+      const csvData = XLSX.utils.sheet_to_csv(workbook.Sheets[workbook.SheetNames[0]]);
+      await handleConversion(req, res, {
+        buffer: Buffer.from(csvData),
+        filename: file.originalname.replace(/\.[^.]+$/, ".csv"),
+        mimetype: "text/csv"
+      });
+    } else if (outputFormat === "json") {
+      const jsonData = XLSX.utils.sheet_to_json(workbook.Sheets[workbook.SheetNames[0]]);
+      await handleConversion(req, res, {
+        buffer: Buffer.from(JSON.stringify(jsonData, null, 2)),
+        filename: file.originalname.replace(/\.[^.]+$/, ".json"),
+        mimetype: "application/json"
+      });
+    } else if (outputFormat === "html") {
+      const htmlData = XLSX.utils.sheet_to_html(workbook.Sheets[workbook.SheetNames[0]]);
+      await handleConversion(req, res, {
+        buffer: Buffer.from(htmlData),
+        filename: file.originalname.replace(/\.[^.]+$/, ".html"),
+        mimetype: "text/html"
+      });
+    } else {
+      // PDF
+      const pdfDoc = await PDFDocument.create();
+      const font = await pdfDoc.embedFont(StandardFonts.Courier);
+      const fontBold = await pdfDoc.embedFont(StandardFonts.CourierBold);
+      
+      for (const sheetName of workbook.SheetNames) {
+        const worksheet = workbook.Sheets[sheetName];
+        const csvData = XLSX.utils.sheet_to_csv(worksheet);
+        
+        let page = pdfDoc.addPage([792, 612]); // Landscape
+        let y = 570;
+        
+        page.drawText(`Sheet: ${sheetName}`, { x: 50, y, size: 14, font: fontBold, color: rgb(0, 0, 0.5) });
+        y -= 25;
+        
+        const rows = csvData.split("\n");
+        for (const row of rows) {
+          if (y < 40) {
+            page = pdfDoc.addPage([792, 612]);
+            y = 570;
+          }
+          page.drawText(row.substring(0, 110), { x: 30, y, size: 8, font, color: rgb(0, 0, 0) });
+          y -= 12;
+        }
+      }
+      
+      const pdfBytes = await pdfDoc.save();
+      
+      await handleConversion(req, res, {
+        buffer: Buffer.from(pdfBytes),
+        filename: file.originalname.replace(/\.[^.]+$/, ".pdf"),
+        mimetype: "application/pdf"
+      });
+    }
+  } catch (error) {
+    console.error("Excel converter error:", error);
+    res.status(500).json({ message: "Excel conversion failed" });
+  }
+});
+
+// Word Converter - Convert Word to various formats
+router.post("/word-converter", optionalAuth, upload.single("file"), async (req: AuthRequest, res: Response): Promise<void> => {
+  try {
+    const file = req.file;
+    if (!file) {
+      res.status(400).json({ message: "No file provided" });
+      return;
+    }
+    
+    const outputFormat = (req.body.format || "pdf").toString(); // pdf, html, txt, markdown
+    
+    const result = await mammoth.extractRawText({ buffer: file.buffer });
+    const text = result.value || "";
+    
+    if (outputFormat === "txt") {
+      await handleConversion(req, res, {
+        buffer: Buffer.from(text),
+        filename: file.originalname.replace(/\.[^.]+$/, ".txt"),
+        mimetype: "text/plain"
+      });
+    } else if (outputFormat === "html") {
+      const htmlResult = await mammoth.convertToHtml({ buffer: file.buffer });
+      const html = `<!DOCTYPE html><html><head><meta charset="UTF-8"><title>${file.originalname}</title></head><body>${htmlResult.value}</body></html>`;
+      await handleConversion(req, res, {
+        buffer: Buffer.from(html),
+        filename: file.originalname.replace(/\.[^.]+$/, ".html"),
+        mimetype: "text/html"
+      });
+    } else if (outputFormat === "markdown") {
+      const htmlResult = await mammoth.convertToHtml({ buffer: file.buffer });
+      // Simple HTML to Markdown conversion
+      let md = htmlResult.value
+        .replace(/<h1[^>]*>(.*?)<\/h1>/gi, "# $1\n\n")
+        .replace(/<h2[^>]*>(.*?)<\/h2>/gi, "## $1\n\n")
+        .replace(/<h3[^>]*>(.*?)<\/h3>/gi, "### $1\n\n")
+        .replace(/<p[^>]*>(.*?)<\/p>/gi, "$1\n\n")
+        .replace(/<strong>(.*?)<\/strong>/gi, "**$1**")
+        .replace(/<b>(.*?)<\/b>/gi, "**$1**")
+        .replace(/<em>(.*?)<\/em>/gi, "*$1*")
+        .replace(/<i>(.*?)<\/i>/gi, "*$1*")
+        .replace(/<li[^>]*>(.*?)<\/li>/gi, "- $1\n")
+        .replace(/<[^>]+>/g, "");
+      
+      await handleConversion(req, res, {
+        buffer: Buffer.from(md),
+        filename: file.originalname.replace(/\.[^.]+$/, ".md"),
+        mimetype: "text/markdown"
+      });
+    } else {
+      // PDF
+      const pdfDoc = await PDFDocument.create();
+      const font = await pdfDoc.embedFont(StandardFonts.Helvetica);
+      let page = pdfDoc.addPage([612, 792]);
+      let y = 750;
+      
+      const lines = text.split("\n");
+      for (const line of lines) {
+        if (y < 50) {
+          page = pdfDoc.addPage([612, 792]);
+          y = 750;
+        }
+        const wrappedLines = line.match(/.{1,80}/g) || [line];
+        for (const wrappedLine of wrappedLines) {
+          if (y < 50) {
+            page = pdfDoc.addPage([612, 792]);
+            y = 750;
+          }
+          page.drawText(wrappedLine, { x: 50, y, size: 11, font, color: rgb(0, 0, 0) });
+          y -= 16;
+        }
+      }
+      
+      const pdfBytes = await pdfDoc.save();
+      
+      await handleConversion(req, res, {
+        buffer: Buffer.from(pdfBytes),
+        filename: file.originalname.replace(/\.[^.]+$/, ".pdf"),
+        mimetype: "application/pdf"
+      });
+    }
+  } catch (error) {
+    console.error("Word converter error:", error);
+    res.status(500).json({ message: "Word conversion failed" });
+  }
+});
+
+// Word to JPG
+router.post("/word-to-jpg", optionalAuth, upload.single("file"), async (req: AuthRequest, res: Response): Promise<void> => {
+  try {
+    const file = req.file;
+    if (!file) {
+      res.status(400).json({ message: "No file provided" });
+      return;
+    }
+    
+    // First convert to PDF, then to JPG
+    const result = await mammoth.extractRawText({ buffer: file.buffer });
+    const text = result.value || "";
+    
+    const pdfDoc = await PDFDocument.create();
+    const font = await pdfDoc.embedFont(StandardFonts.Helvetica);
+    let page = pdfDoc.addPage([612, 792]);
+    let y = 750;
+    
+    const lines = text.split("\n");
+    for (const line of lines) {
+      if (y < 50) {
+        page = pdfDoc.addPage([612, 792]);
+        y = 750;
+      }
+      const wrappedLines = line.match(/.{1,80}/g) || [line];
+      for (const wrappedLine of wrappedLines) {
+        if (y < 50) {
+          page = pdfDoc.addPage([612, 792]);
+          y = 750;
+        }
+        page.drawText(wrappedLine, { x: 50, y, size: 11, font, color: rgb(0, 0, 0) });
+        y -= 16;
+      }
+    }
+    
+    const pdfBytes = await pdfDoc.save();
+    
+    // Render PDF to JPG
+    const imageBuffers = await renderPdfToImages(Buffer.from(pdfBytes), { format: "jpg", quality: 90, scale: 2.0 });
+    
+    const files = imageBuffers.map((buffer, index) => ({
+      buffer,
+      filename: file.originalname.replace(/\.[^.]+$/, `_page${index + 1}.jpg`),
+      mimetype: "image/jpeg"
+    }));
+    
+    await handleConversion(req, res, files);
+  } catch (error) {
+    console.error("Word to JPG error:", error);
+    res.status(500).json({ message: "Conversion failed" });
+  }
+});
+
+// Word to PNG
+router.post("/word-to-png", optionalAuth, upload.single("file"), async (req: AuthRequest, res: Response): Promise<void> => {
+  try {
+    const file = req.file;
+    if (!file) {
+      res.status(400).json({ message: "No file provided" });
+      return;
+    }
+    
+    // First convert to PDF, then to PNG
+    const result = await mammoth.extractRawText({ buffer: file.buffer });
+    const text = result.value || "";
+    
+    const pdfDoc = await PDFDocument.create();
+    const font = await pdfDoc.embedFont(StandardFonts.Helvetica);
+    let page = pdfDoc.addPage([612, 792]);
+    let y = 750;
+    
+    const lines = text.split("\n");
+    for (const line of lines) {
+      if (y < 50) {
+        page = pdfDoc.addPage([612, 792]);
+        y = 750;
+      }
+      const wrappedLines = line.match(/.{1,80}/g) || [line];
+      for (const wrappedLine of wrappedLines) {
+        if (y < 50) {
+          page = pdfDoc.addPage([612, 792]);
+          y = 750;
+        }
+        page.drawText(wrappedLine, { x: 50, y, size: 11, font, color: rgb(0, 0, 0) });
+        y -= 16;
+      }
+    }
+    
+    const pdfBytes = await pdfDoc.save();
+    
+    // Render PDF to PNG
+    const imageBuffers = await renderPdfToImages(Buffer.from(pdfBytes), { format: "png", quality: 95, scale: 2.0 });
+    
+    const files = imageBuffers.map((buffer, index) => ({
+      buffer,
+      filename: file.originalname.replace(/\.[^.]+$/, `_page${index + 1}.png`),
+      mimetype: "image/png"
+    }));
+    
+    await handleConversion(req, res, files);
+  } catch (error) {
+    console.error("Word to PNG error:", error);
+    res.status(500).json({ message: "Conversion failed" });
+  }
+});
+
+// Flipkart PDF Tool - Generate Flipkart shipping labels
+router.post("/flipkart-pdf-tool", optionalAuth, upload.single("file"), async (req: AuthRequest, res: Response): Promise<void> => {
+  try {
+    const file = req.file;
+    
+    // If file provided, extract and reformat for Flipkart
+    // Otherwise, generate a blank Flipkart label template
+    const pdfDoc = await PDFDocument.create();
+    const font = await pdfDoc.embedFont(StandardFonts.Helvetica);
+    const fontBold = await pdfDoc.embedFont(StandardFonts.HelveticaBold);
+    
+    // Flipkart label dimensions (4x6 inches)
+    const page = pdfDoc.addPage([288, 432]);
+    
+    // Label data from request or defaults
+    const orderData = {
+      orderId: req.body.orderId || "OD" + Date.now(),
+      sku: req.body.sku || "SKU001",
+      productName: req.body.productName || "Product Name",
+      sellerName: req.body.sellerName || "Seller Name",
+      sellerAddress: req.body.sellerAddress || "Seller Address",
+      buyerName: req.body.buyerName || "Buyer Name",
+      buyerAddress: req.body.buyerAddress || "Buyer Address",
+      buyerPhone: req.body.buyerPhone || "9999999999",
+      buyerPincode: req.body.buyerPincode || "000000",
+      paymentMode: req.body.paymentMode || "PREPAID",
+      weight: req.body.weight || "0.5 kg"
+    };
+    
+    let y = 410;
+    
+    // Header
+    page.drawRectangle({ x: 10, y: y - 10, width: 268, height: 30, color: rgb(0.2, 0.4, 0.8) });
+    page.drawText("FLIPKART", { x: 100, y: y, size: 18, font: fontBold, color: rgb(1, 1, 1) });
+    y -= 50;
+    
+    // Order ID
+    page.drawText(`Order ID: ${orderData.orderId}`, { x: 15, y, size: 10, font: fontBold });
+    y -= 20;
+    
+    // From (Seller)
+    page.drawText("FROM:", { x: 15, y, size: 8, font: fontBold, color: rgb(0.5, 0.5, 0.5) });
+    y -= 12;
+    page.drawText(orderData.sellerName.substring(0, 35), { x: 15, y, size: 9, font });
+    y -= 12;
+    page.drawText(orderData.sellerAddress.substring(0, 40), { x: 15, y, size: 8, font });
+    y -= 25;
+    
+    // Divider
+    page.drawLine({ start: { x: 15, y: y + 5 }, end: { x: 273, y: y + 5 }, thickness: 1, color: rgb(0.8, 0.8, 0.8) });
+    
+    // To (Buyer)
+    page.drawText("TO:", { x: 15, y, size: 8, font: fontBold, color: rgb(0.5, 0.5, 0.5) });
+    y -= 15;
+    page.drawText(orderData.buyerName.substring(0, 35), { x: 15, y, size: 11, font: fontBold });
+    y -= 15;
+    page.drawText(orderData.buyerAddress.substring(0, 40), { x: 15, y, size: 9, font });
+    y -= 12;
+    page.drawText(orderData.buyerAddress.substring(40, 80) || "", { x: 15, y, size: 9, font });
+    y -= 15;
+    page.drawText(`Phone: ${orderData.buyerPhone}`, { x: 15, y, size: 9, font });
+    y -= 20;
+    
+    // Pincode box
+    page.drawRectangle({ x: 15, y: y - 10, width: 100, height: 35, borderColor: rgb(0, 0, 0), borderWidth: 2 });
+    page.drawText("PIN:", { x: 20, y: y + 10, size: 8, font, color: rgb(0.5, 0.5, 0.5) });
+    page.drawText(orderData.buyerPincode, { x: 20, y: y - 5, size: 16, font: fontBold });
+    
+    // Payment mode
+    const paymentColor = orderData.paymentMode === "COD" ? rgb(1, 0.5, 0) : rgb(0, 0.7, 0);
+    page.drawRectangle({ x: 150, y: y - 10, width: 70, height: 35, color: paymentColor });
+    page.drawText(orderData.paymentMode, { x: 160, y, size: 12, font: fontBold, color: rgb(1, 1, 1) });
+    
+    y -= 50;
+    
+    // Product details
+    page.drawText(`Product: ${orderData.productName.substring(0, 40)}`, { x: 15, y, size: 8, font });
+    y -= 12;
+    page.drawText(`SKU: ${orderData.sku}  |  Weight: ${orderData.weight}`, { x: 15, y, size: 8, font });
+    
+    const pdfBytes = await pdfDoc.save();
+    
+    await handleConversion(req, res, {
+      buffer: Buffer.from(pdfBytes),
+      filename: `flipkart_label_${orderData.orderId}.pdf`,
+      mimetype: "application/pdf"
+    });
+  } catch (error) {
+    console.error("Flipkart PDF tool error:", error);
+    res.status(500).json({ message: "Label generation failed" });
+  }
+});
+
+// Meesho PDF Tool - Generate Meesho shipping labels
+router.post("/meesho-pdf-tool", optionalAuth, upload.single("file"), async (req: AuthRequest, res: Response): Promise<void> => {
+  try {
+    const pdfDoc = await PDFDocument.create();
+    const font = await pdfDoc.embedFont(StandardFonts.Helvetica);
+    const fontBold = await pdfDoc.embedFont(StandardFonts.HelveticaBold);
+    
+    // Meesho label dimensions (4x6 inches)
+    const page = pdfDoc.addPage([288, 432]);
+    
+    const orderData = {
+      orderId: req.body.orderId || "MS" + Date.now(),
+      subOrderId: req.body.subOrderId || "SUB001",
+      productName: req.body.productName || "Product Name",
+      size: req.body.size || "Free Size",
+      quantity: req.body.quantity || "1",
+      sellerName: req.body.sellerName || "Seller Name",
+      buyerName: req.body.buyerName || "Buyer Name",
+      buyerAddress: req.body.buyerAddress || "Buyer Address",
+      buyerPhone: req.body.buyerPhone || "9999999999",
+      buyerPincode: req.body.buyerPincode || "000000",
+      paymentMode: req.body.paymentMode || "PREPAID",
+      returnAddress: req.body.returnAddress || "Return Address"
+    };
+    
+    let y = 410;
+    
+    // Header - Meesho pink theme
+    page.drawRectangle({ x: 10, y: y - 10, width: 268, height: 30, color: rgb(0.93, 0.23, 0.51) });
+    page.drawText("meesho", { x: 110, y: y, size: 18, font: fontBold, color: rgb(1, 1, 1) });
+    y -= 50;
+    
+    // Order details
+    page.drawText(`Order: ${orderData.orderId}`, { x: 15, y, size: 9, font: fontBold });
+    page.drawText(`Sub: ${orderData.subOrderId}`, { x: 180, y, size: 8, font });
+    y -= 25;
+    
+    // Shipping To
+    page.drawRectangle({ x: 10, y: y - 80, width: 268, height: 95, borderColor: rgb(0, 0, 0), borderWidth: 1 });
+    page.drawText("SHIP TO:", { x: 15, y: y - 5, size: 8, font: fontBold, color: rgb(0.93, 0.23, 0.51) });
+    y -= 18;
+    page.drawText(orderData.buyerName.substring(0, 35), { x: 15, y, size: 10, font: fontBold });
+    y -= 14;
+    page.drawText(orderData.buyerAddress.substring(0, 42), { x: 15, y, size: 8, font });
+    y -= 12;
+    page.drawText(orderData.buyerAddress.substring(42, 84) || "", { x: 15, y, size: 8, font });
+    y -= 14;
+    page.drawText(`Ph: ${orderData.buyerPhone}`, { x: 15, y, size: 8, font });
+    
+    // Pincode
+    page.drawRectangle({ x: 180, y: y - 15, width: 90, height: 40, color: rgb(0.95, 0.95, 0.95) });
+    page.drawText("PIN", { x: 210, y: y + 15, size: 8, font, color: rgb(0.5, 0.5, 0.5) });
+    page.drawText(orderData.buyerPincode, { x: 195, y: y - 5, size: 14, font: fontBold });
+    
+    y -= 45;
+    
+    // Product info
+    page.drawText(`Product: ${orderData.productName.substring(0, 35)}`, { x: 15, y, size: 8, font });
+    y -= 12;
+    page.drawText(`Size: ${orderData.size}  |  Qty: ${orderData.quantity}`, { x: 15, y, size: 8, font });
+    y -= 20;
+    
+    // Payment badge
+    const paymentColor = orderData.paymentMode === "COD" ? rgb(1, 0.4, 0) : rgb(0.2, 0.7, 0.3);
+    page.drawRectangle({ x: 100, y: y - 5, width: 80, height: 25, color: paymentColor });
+    page.drawText(orderData.paymentMode, { x: 115, y: y + 3, size: 11, font: fontBold, color: rgb(1, 1, 1) });
+    
+    y -= 40;
+    
+    // Return address (smaller)
+    page.drawText("Return: " + orderData.returnAddress.substring(0, 50), { x: 15, y, size: 6, font, color: rgb(0.5, 0.5, 0.5) });
+    
+    const pdfBytes = await pdfDoc.save();
+    
+    await handleConversion(req, res, {
+      buffer: Buffer.from(pdfBytes),
+      filename: `meesho_label_${orderData.orderId}.pdf`,
+      mimetype: "application/pdf"
+    });
+  } catch (error) {
+    console.error("Meesho PDF tool error:", error);
+    res.status(500).json({ message: "Label generation failed" });
+  }
+});
+
+// Manual Crop - Crop PDF based on coordinates
+router.post("/manual-crop", optionalAuth, upload.single("file"), async (req: AuthRequest, res: Response): Promise<void> => {
+  try {
+    const file = req.file;
+    if (!file) {
+      res.status(400).json({ message: "No file provided" });
+      return;
+    }
+    
+    // Get crop coordinates (in points, where 72 points = 1 inch)
+    const left = parseInt(req.body.left || "0");
+    const right = parseInt(req.body.right || "0");
+    const top = parseInt(req.body.top || "0");
+    const bottom = parseInt(req.body.bottom || "0");
+    const pageNum = parseInt(req.body.page || "0"); // 0 = all pages
+    
+    const pdf = await PDFDocument.load(file.buffer);
+    const pages = pdf.getPages();
+    
+    const pagesToCrop = pageNum > 0 ? [pages[pageNum - 1]] : pages;
+    
+    for (const page of pagesToCrop) {
+      if (!page) continue;
+      
+      const { width, height } = page.getSize();
+      
+      // Apply crop by setting media box
+      page.setMediaBox(
+        left,
+        bottom,
+        width - left - right,
+        height - top - bottom
+      );
+      
+      // Also set crop box
+      page.setCropBox(
+        left,
+        bottom,
+        width - left - right,
+        height - top - bottom
+      );
+    }
+    
+    const pdfBytes = await pdf.save();
+    
+    await handleConversion(req, res, {
+      buffer: Buffer.from(pdfBytes),
+      filename: file.originalname.replace(".pdf", "_cropped.pdf"),
+      mimetype: "application/pdf"
+    });
+  } catch (error) {
+    console.error("Manual crop error:", error);
+    res.status(500).json({ message: "Cropping failed" });
+  }
+});
+
+// Margin Crop - Remove margins from PDF
+router.post("/margin-crop", optionalAuth, upload.single("file"), async (req: AuthRequest, res: Response): Promise<void> => {
+  try {
+    const file = req.file;
+    if (!file) {
+      res.status(400).json({ message: "No file provided" });
+      return;
+    }
+    
+    // Margin to remove from each side (in points)
+    const marginSize = parseInt(req.body.margin || "36"); // Default 0.5 inch
+    const uniformMargin = req.body.uniform !== "false";
+    
+    // Individual margins if not uniform
+    const marginLeft = uniformMargin ? marginSize : parseInt(req.body.marginLeft || marginSize.toString());
+    const marginRight = uniformMargin ? marginSize : parseInt(req.body.marginRight || marginSize.toString());
+    const marginTop = uniformMargin ? marginSize : parseInt(req.body.marginTop || marginSize.toString());
+    const marginBottom = uniformMargin ? marginSize : parseInt(req.body.marginBottom || marginSize.toString());
+    
+    const pdf = await PDFDocument.load(file.buffer);
+    const pages = pdf.getPages();
+    
+    for (const page of pages) {
+      const { width, height } = page.getSize();
+      
+      // Ensure we don't crop more than the page size
+      const effectiveLeft = Math.min(marginLeft, width / 2);
+      const effectiveRight = Math.min(marginRight, width / 2);
+      const effectiveTop = Math.min(marginTop, height / 2);
+      const effectiveBottom = Math.min(marginBottom, height / 2);
+      
+      page.setMediaBox(
+        effectiveLeft,
+        effectiveBottom,
+        width - effectiveLeft - effectiveRight,
+        height - effectiveTop - effectiveBottom
+      );
+      
+      page.setCropBox(
+        effectiveLeft,
+        effectiveBottom,
+        width - effectiveLeft - effectiveRight,
+        height - effectiveTop - effectiveBottom
+      );
+    }
+    
+    const pdfBytes = await pdf.save();
+    
+    await handleConversion(req, res, {
+      buffer: Buffer.from(pdfBytes),
+      filename: file.originalname.replace(".pdf", "_trimmed.pdf"),
+      mimetype: "application/pdf"
+    });
+  } catch (error) {
+    console.error("Margin crop error:", error);
+    res.status(500).json({ message: "Margin cropping failed" });
+  }
 });
 
 export default router;
