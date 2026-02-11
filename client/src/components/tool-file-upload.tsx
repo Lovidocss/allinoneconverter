@@ -112,17 +112,33 @@ export function ToolFileUpload({
     disabled: status === "processing",
   });
 
-  const handleDownload = () => {
+  const handleDownload = async () => {
     if (convertedFiles.length === 0) return;
 
-    convertedFiles.forEach((file) => {
-      const link = document.createElement("a");
-      link.href = file.url; // Use Cloudinary URL directly
-      link.download = file.originalName;
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-    });
+    for (const file of convertedFiles) {
+      try {
+        // Use server proxy for reliable cross-origin downloads
+        const proxyUrl = `${API_URL}/api/convert/download?url=${encodeURIComponent(file.url)}&filename=${encodeURIComponent(file.originalName)}`;
+        const response = await fetch(proxyUrl);
+        if (!response.ok) throw new Error('Download failed');
+        const blob = await response.blob();
+        const blobUrl = window.URL.createObjectURL(blob);
+        
+        const link = document.createElement("a");
+        link.href = blobUrl;
+        link.download = file.originalName;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        
+        // Clean up blob URL
+        window.URL.revokeObjectURL(blobUrl);
+      } catch (err) {
+        console.error('Download error:', err);
+        // Fallback: open in new tab
+        window.open(file.url, '_blank');
+      }
+    }
   };
 
   const handleReset = () => {

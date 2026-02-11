@@ -30,25 +30,22 @@ export const uploadToCloudinary = (
         resource_type: resourceType,
         public_id: uuidv4(),
         format: resourceType === "raw" ? "pdf" : undefined,
+        type: "upload",
+        access_mode: "public",
       },
       (error, result) => {
         if (error) {
           console.error("Cloudinary upload error:", error);
           reject(error);
         } else if (result) {
-          // Generate download URL with attachment flag
-          // Use the secure_url directly and append fl_attachment for download
-          // This avoids issues with signed URLs for raw files
-          const downloadUrl = result.secure_url.replace(
-            "/upload/",
-            "/upload/fl_attachment/"
-          );
-          
+          // For raw files, transformations like fl_attachment are NOT supported
+          // Just use the secure_url directly - download handling should be done client-side
+          // or through a proxy endpoint
           resolve({
             publicId: result.public_id,
             url: result.url,
             secureUrl: result.secure_url,
-            downloadUrl: downloadUrl,
+            downloadUrl: result.secure_url,
             format: result.format,
             resourceType: result.resource_type,
           });

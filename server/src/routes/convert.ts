@@ -3429,4 +3429,46 @@ router.post("/margin-crop", optionalAuth, upload.single("file"), async (req: Aut
   }
 });
 
+// Download proxy endpoint - handles cross-origin downloads
+router.get("/download", async (req: Request, res: Response) => {
+  try {
+    const { url, filename } = req.query;
+    
+    if (!url || typeof url !== "string") {
+      res.status(400).json({ message: "URL is required" });
+      return;
+    }
+    
+    // Validate URL is from Cloudinary
+    if (!url.includes("cloudinary.com")) {
+      res.status(400).json({ message: "Invalid download URL" });
+      return;
+    }
+    
+    // Fetch the file from Cloudinary
+    const response = await fetch(url);
+    
+    if (!response.ok) {
+      res.status(response.status).json({ message: "Failed to fetch file" });
+      return;
+    }
+    
+    // Get content type from response
+    const contentType = response.headers.get("content-type") || "application/octet-stream";
+    const downloadFilename = (filename as string) || "download";
+    
+    // Set headers for download
+    res.setHeader("Content-Type", contentType);
+    res.setHeader("Content-Disposition", `attachment; filename="${encodeURIComponent(downloadFilename)}"`);
+    res.setHeader("Access-Control-Allow-Origin", "*");
+    
+    // Stream the response
+    const buffer = await response.arrayBuffer();
+    res.send(Buffer.from(buffer));
+  } catch (error) {
+    console.error("Download proxy error:", error);
+    res.status(500).json({ message: "Download failed" });
+  }
+});
+
 export default router;
